@@ -73,7 +73,15 @@ async function loadSource(source: GraphSource, io: StreamIo): Promise<{ nodes: M
 
 async function defaultFetchJson(url: string): Promise<unknown> {
   const response = await fetch(url, { credentials: "include" });
-  if (!response.ok) throw new Error(`The memory graph request failed (${response.status}).`);
+  if (!response.ok) {
+    // Prefer the API's own message (it explains a 403 for large graphs); fall back to a status-specific sentence.
+    const body = await response.json().catch(() => null) as { error?: { message?: unknown } } | null;
+    const apiMessage = typeof body?.error?.message === "string" ? body.error.message : null;
+    throw new Error(apiMessage
+      ?? (response.status === 403 ? "Loading a large memory graph requires administrator permissions."
+        : response.status === 401 ? "Your session has expired. Sign in again to load the memory graph."
+          : `The memory graph request failed (${response.status}).`));
+  }
   return response.json();
 }
 

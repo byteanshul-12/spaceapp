@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MemoryGraphEdge, MemoryGraphNode } from "@space/contracts";
 import { layoutMemoryNetwork3D } from "../src/features/memory-workspace/memory-3d.js";
 import { MemorySceneStream, runSceneJob, type GraphSource, type StreamIo, type WorkerLike, type WorkerMessage, type WorkerRequest } from "../src/features/memory-workspace/memory-layout-stream.js";
@@ -71,6 +71,30 @@ describe("layout streaming protocol", () => {
     const h = harness(); h.io.fetchJson = async () => ({ data: { nodes: graph.nodes, edges: graph.edges, totalMatchingNodes: 9999, truncated: true, summary: { recordCount: 42 } } });
     await runSceneJob(1, { kind: "url", url: "/api/x" }, h.io);
     expect((h.messages[0] as Extract<WorkerMessage, { type: "scene" }>).meta).toMatchObject({ recordCount: 42, totalMatchingNodes: 9999, truncated: true, rawNodeCount: 250 });
+  });
+});
+
+describe("load failures from the server", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const failWith = async (status: number, body: unknown) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body === null ? "not json" : JSON.stringify(body), { status })));
+    const h = harness();
+    await runSceneJob(5, { kind: "url", url: "/api/admin/memory/graph/overview?limit=50000" }, h.io);
+    return h.messages;
+  };
+  it("passes the API's 403 message on to the view", async () => {
+    expect(await failWith(403, { error: { code: "ADMIN_REQUIRED", message: "Loading more than 2,000 memory nodes requires administrator permissions." } }))
+      .toEqual([{ type: "error", id: 5, message: "Loading more than 2,000 memory nodes requires administrator permissions." }]);
+  });
+  it("falls back to a clear sentence when the error body is not the API shape", async () => {
+    expect((await failWith(403, null))[0]).toMatchObject({ type: "error", message: expect.stringContaining("administrator") });
+    expect((await failWith(401, null))[0]).toMatchObject({ message: expect.stringContaining("Sign in") });
+    expect((await failWith(500, null))[0]).toMatchObject({ message: "The memory graph request failed (500)." });
+  });
+  it("surfaces a worker error through the stream so the workspace can render it", () => {
+    const stream = new MemorySceneStream(synthetic(300), null);
+    stream.handle({ type: "error", id: stream.id, message: "boom" });
+    expect(stream.error).toBe("boom");
   });
 });
 

@@ -180,6 +180,15 @@ describe("canvas attributes", () => {
     expect(canvas.getAttribute("data-titles-visible")).toBe("true");
     expect(canvas.getAttribute("data-layout-volume")).toBe("0.0000");
   });
+  it("shows a fetch or worker error over the canvas instead of leaving it empty", () => {
+    const { container, rerender } = render(<MemoryGraph3D stream={null} scene={null} showTitles selectedNodeId={null} onSelectNode={() => {}} loading={false} resetToken={0} />);
+    expect(container.querySelector("[role=alert]")).toBeNull();
+    rerender(<MemoryGraph3D stream={null} scene={null} error="Loading a large memory graph requires administrator permissions." showTitles selectedNodeId={null} onSelectNode={() => {}} loading={false} resetToken={0} />);
+    const alert = container.querySelector("[role=alert]")!;
+    expect(alert.textContent).toContain("could not be loaded");
+    expect(alert.textContent).toContain("requires administrator permissions");
+    expect(container.querySelector("canvas")).not.toBeNull(); // the canvas and its attributes stay
+  });
   it("renders the static Canvas 2D view with the same attributes", () => {
     const { container } = render(<MemoryGraph3DStatic nodes={[]} edges={[]} positions={new Map()} coordinates={new Map()} showTitles={false} selectedNodeId={null} onSelectNode={() => {}} loading={false} resetToken={0} />);
     const canvas = container.querySelector("canvas")!;

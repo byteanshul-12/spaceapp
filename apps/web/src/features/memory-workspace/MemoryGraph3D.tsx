@@ -13,10 +13,12 @@ import { volumeRatioFromArrays } from "./memory-volume.js";
  * context is lost, a fresh Canvas 2D element renders a capped copy (2,000 nodes / 6,000 edges) and the GL canvas
  * stays mounted (hidden) so a restored context can switch back.
  */
-export function MemoryGraph3D({ stream, scene, showTitles, selectedNodeId, onSelectNode, loading, resetToken }: {
+export function MemoryGraph3D({ stream, scene, showTitles, selectedNodeId, onSelectNode, loading, resetToken, error = null }: {
   stream: MemorySceneStream | null; scene: MemoryScene | null;
   showTitles: boolean; selectedNodeId: string | null; onSelectNode: (id: string) => void;
   loading: boolean; resetToken: number;
+  /** A failed fetch or worker error; shown over the canvas so the view is never silently empty. */
+  error?: string | null;
 }) {
   const [supported] = useState(() => probeWebGL2());
   const [status, setStatus] = useState<MemoryGLStatus>({ failed: false, lost: false });
@@ -48,6 +50,7 @@ export function MemoryGraph3D({ stream, scene, showTitles, selectedNodeId, onSel
   return <div className="memory-3d-surface" data-renderer={mode}>
     {supported ? <MemoryGraph3DGL stream={stream} scene={scene} showTitles={showTitles} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} loading={loading} resetToken={resetToken} volume={volume} hidden={mode !== "webgl"} cameraRef={cameraRef} onStatus={onStatus} /> : null}
     {mode === "canvas2d" ? <MemoryGraph3DCanvas2D nodes={fallback?.nodes ?? []} edges={fallback?.edges ?? []} positions={fallback?.positions ?? EMPTY_POSITIONS} coordinates={fallback?.coordinates ?? EMPTY_COORDINATES} showTitles={showTitles} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} loading={loading} resetToken={resetToken} volume={volume} cameraRef={cameraRef} /> : null}
+    {error ? <div className="memory-3d-error" role="alert"><strong>The 3D memory graph could not be loaded.</strong><span>{error}</span></div> : null}
     <span className="memory-3d-hint">Drag to rotate 360° · Scroll or pinch to zoom · Click to explore</span>
   </div>;
 }

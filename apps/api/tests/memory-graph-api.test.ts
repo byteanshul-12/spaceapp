@@ -14,6 +14,8 @@ const sessionToken = signSession(
   sessionSecret
 );
 const cookie = `space_session=${sessionToken}`;
+const adminCookie = `space_session=${signSession({ id: "user:admin", email: "admin@space.test", role: "ADMIN" }, sessionSecret)}`;
+const userCookie = `space_session=${signSession({ id: "user:member", email: "member@space.test", role: "USER" }, sessionSecret)}`;
 const csrfToken = createCsrfToken(sessionToken, sessionSecret)!;
 const mutationHeaders = {
   cookie,
@@ -443,7 +445,7 @@ describe("Memory graph API", () => {
       extra(graph);
       return graph;
     };
-    const get = (app: Awaited<ReturnType<typeof memoryGraphApp>>, query: string, headers: Record<string, string> = { cookie }) =>
+    const get = (app: Awaited<ReturnType<typeof memoryGraphApp>>, query: string, headers: Record<string, string> = { cookie: adminCookie }) =>
       app.inject({ method: "GET", url: `/api/admin/memory/graph/overview${query}`, headers });
 
     it("keeps the 2,000 node and 6,000 edge defaults when the limit is omitted", async () => {
@@ -473,10 +475,17 @@ describe("Memory graph API", () => {
       await app.close();
     });
 
-    it("still requires authentication at a large limit", async () => {
-      // The route has no role check beyond the session (a USER session is served today); only 401 is asserted.
-      const app = await memoryGraphApp(true, new InMemorySpaceStore(), false, undefined, { graphSnapshot: largeSnapshot(300) });
+    it("gates limits above 2,000 to ADMIN while the default stays open to every signed-in user", async () => {
+      const app = await memoryGraphApp(true, new InMemorySpaceStore(), false, undefined, { graphSnapshot: largeSnapshot(3000) });
+      const forbidden = await get(app, "?limit=50000", { cookie: userCookie });
+      expect(forbidden.statusCode).toBe(403);
+      expect(forbidden.json().error.code).toBe("ADMIN_REQUIRED");
+      expect((await get(app, "?limit=2001", { cookie })).statusCode).toBe(403); // OPERATOR is not ADMIN
+      expect((await get(app, "?limit=50000", { cookie: adminCookie })).statusCode).toBe(200);
+      expect((await get(app, "", { cookie: userCookie })).statusCode).toBe(200);
+      expect((await get(app, "?limit=2000", { cookie: userCookie })).statusCode).toBe(200);
       expect((await get(app, "?limit=50000", {})).statusCode).toBe(401);
+      expect((await get(app, "", {})).statusCode).toBe(401);
       await app.close();
     });
 
@@ -519,8 +528,8 @@ describe("Memory graph API", () => {
       expect(base.headers.etag).toBe(`"${"e".repeat(64)}"`);
       expect(explicitDefault.headers.etag).toBe(base.headers.etag);
       expect(large.headers.etag).not.toBe(base.headers.etag);
-      expect((await get(app, "?limit=3000", { cookie, "if-none-match": large.headers.etag as string })).statusCode).toBe(304);
-      const crossed = await get(app, "?limit=3000", { cookie, "if-none-match": base.headers.etag as string });
+      expect((await get(app, "?limit=3000", { cookie: adminCookie, "if-none-match": large.headers.etag as string })).statusCode).toBe(304);
+      const crossed = await get(app, "?limit=3000", { cookie: adminCookie, "if-none-match": base.headers.etag as string });
       expect(crossed.statusCode).toBe(200);
       expect(crossed.json().data.nodes).toHaveLength(3000);
       await app.close();

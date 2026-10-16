@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { sendApiError } from "./http-errors.js";
 import {
   createMemoryChangeSetInputSchema,
   createMemoryNodeChangeSetInputSchema,
@@ -359,6 +360,10 @@ export function registerMemoryGraphRoutes(
   app.get("/api/admin/memory/graph/overview", async (request, reply) => {
     requireMemoryGraph(options.config);
     const query = listMemoryGraphOverviewQuerySchema.parse(request.query);
+    // The default sample stays open to every signed-in user; a larger graph is an administrator-only export.
+    if (query.limit > MEMORY_GRAPH_OVERVIEW_DEFAULT_LIMIT && request.user?.role !== "ADMIN") {
+      return sendApiError(reply, 403, "ADMIN_REQUIRED", "Loading more than 2,000 memory nodes requires administrator permissions.");
+    }
     const snapshotData = query.month
       ? await (options.service.getArchiveSnapshotState?.() ?? options.service.getArchiveSnapshot().then(snapshot => ({ snapshot, isStale: false })))
       : await options.service.getSnapshot();

@@ -178,6 +178,7 @@
 .memory-3d-surface canvas:active { cursor: grabbing; }
 .memory-3d-surface canvas[hidden] { display: none; }
 .memory-3d-surface canvas.memory-3d-labels { position: absolute; inset: 0; pointer-events: none; cursor: default; }
+.memory-3d-error { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: min(420px, 90%); display: grid; gap: 6px; padding: 14px 18px; border-radius: 12px; border: 1px solid #7a3a44; background: #2a1219ee; color: #ffd5da; font-size: 13px; text-align: center; z-index: 2; }
 .memory-3d-hint { position: absolute; bottom: 26px; left: 0; right: 0; text-align: center; font-size: 10px; color: #95aec2; pointer-events: none; }
 #memory-atlas .memory-atlas-topics { max-height: min(38%, 320px); overflow: auto; scrollbar-width: thin; }
 @media (max-width: 700px) {
