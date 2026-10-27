@@ -286,6 +286,25 @@ describe("Snip Tool capture", () => {
     await waitFor(() => expect(navigator.clipboard.write).toHaveBeenCalledTimes(2));
   });
 
+  it("captures the full screen 3 seconds after the timer is pressed, and a second press cancels", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<SnipToolOverlay isOpen onClose={vi.fn()} onCapture={vi.fn().mockResolvedValue(undefined)} />);
+      fireEvent.click(screen.getByRole("button", { name: "Capture in 3 seconds" }));
+      act(() => { vi.advanceTimersByTime(1000); });
+      fireEvent.click(screen.getByRole("button", { name: "Cancel delayed capture (2)" }));
+      act(() => { vi.advanceTimersByTime(5000); });
+      expect(captureDomFrame).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Capture in 3 seconds" }));
+      act(() => { vi.advanceTimersByTime(2000); });
+      expect(captureDomFrame).not.toHaveBeenCalled();
+      await act(async () => { vi.advanceTimersByTime(1000); });
+      expect(vi.mocked(captureDomFrame).mock.calls[0]![0].region).toEqual({ x: 0, y: 0, width: 800, height: 600 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("auto-closes after a capture only when autoCloseOnCapture is set", async () => {
     const onClose = vi.fn(), onCapture = vi.fn().mockResolvedValue(undefined);
     render(<SnipToolOverlay isOpen autoCloseOnCapture onClose={onClose} activePaneId="pane:1" onCapture={onCapture} />);
@@ -313,6 +332,27 @@ describe("Snip Tool destination", () => {
     expect(onCapture.mock.calls[0]![1]).toBe("pane:hugo");
     fireEvent.click(screen.getByRole("button", { name: "Unlock target pane (locked to Hugo)" }));
     expect(screen.getByRole("button", { name: "Snip: Finn" })).toBeTruthy();
+  });
+
+  it("Ctrl+V pastes a clipboard image into the target pane and clipboard text through the CLI's own paste", async () => {
+    const onCapture = vi.fn().mockResolvedValue(undefined);
+    const read = vi.fn().mockResolvedValue([{ types: ["image/png"], getType: vi.fn().mockResolvedValue(new Blob(["png"], { type: "image/png" })) }]);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { read } });
+    render(<SnipToolOverlay isOpen onClose={vi.fn()} availablePanes={cliPanes} activePaneId="pane:finn" activePaneMode="TERMINAL" onCapture={onCapture} />);
+    const paste = screen.getByRole("button", { name: "Paste the clipboard into Finn" });
+    fireEvent.click(paste);
+    await waitFor(() => expect(onCapture).toHaveBeenCalledOnce());
+    expect(onCapture.mock.calls[0]![0].type).toBe("image/png");
+    expect(onCapture.mock.calls[0]![1]).toBe("pane:finn");
+    expect(await screen.findByText("Pasted into Finn.")).toBeTruthy();
+    read.mockResolvedValue([{ types: ["text/plain"], getType: vi.fn() }]);
+    const action = vi.fn();
+    window.addEventListener("space:terminal-pane-action", action);
+    fireEvent.click(paste);
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    window.removeEventListener("space:terminal-pane-action", action);
+    expect((action.mock.calls[0]![0] as CustomEvent).detail).toEqual({ paneId: "pane:finn", action: "paste" });
+    expect(onCapture).toHaveBeenCalledOnce();
   });
 
   it("releases the lock when the locked pane closes", () => {

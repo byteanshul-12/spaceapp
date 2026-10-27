@@ -475,15 +475,18 @@ describe("Memory graph API", () => {
       await app.close();
     });
 
-    it("gates limits above 2,000 to ADMIN while the default stays open to every signed-in user", async () => {
+    it("gates limits above 2,000 to ADMIN; a USER session never reaches the route", async () => {
       const app = await memoryGraphApp(true, new InMemorySpaceStore(), false, undefined, { graphSnapshot: largeSnapshot(3000) });
-      const forbidden = await get(app, "?limit=50000", { cookie: userCookie });
-      expect(forbidden.statusCode).toBe(403);
-      expect(forbidden.json().error.code).toBe("ADMIN_REQUIRED");
-      expect((await get(app, "?limit=2001", { cookie })).statusCode).toBe(403); // OPERATOR is not ADMIN
+      // USER accounts answer 404 here: upstream's owned-resource guard (owned-resource-access.ts) has no owner for Space Memory.
+      expect((await get(app, "", { cookie: userCookie })).statusCode).toBe(404);
+      expect((await get(app, "?limit=50000", { cookie: userCookie })).statusCode).toBe(404);
+      expect((await get(app, "", { cookie })).statusCode).toBe(200);
+      for (const limit of ["2001", "50000"]) {
+        const forbidden = await get(app, `?limit=${limit}`, { cookie }); // OPERATOR is not ADMIN
+        expect(forbidden.statusCode, limit).toBe(403);
+        expect(forbidden.json().error.code, limit).toBe("ADMIN_REQUIRED");
+      }
       expect((await get(app, "?limit=50000", { cookie: adminCookie })).statusCode).toBe(200);
-      expect((await get(app, "", { cookie: userCookie })).statusCode).toBe(200);
-      expect((await get(app, "?limit=2000", { cookie: userCookie })).statusCode).toBe(200);
       expect((await get(app, "?limit=50000", {})).statusCode).toBe(401);
       expect((await get(app, "", {})).statusCode).toBe(401);
       await app.close();

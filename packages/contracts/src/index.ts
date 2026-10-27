@@ -1,4 +1,6 @@
+import "./zod-runtime.js";
 export * from "./schemas.js";
+export * from "./broker-scopes.js";
 export * from "./workflows.js";
 export * from "./public-waitlist.js";
 export * from "./heavy-mcp.js";
@@ -44,14 +46,23 @@ export * from "./job-apply.js";
 export * from "./copilot.js";
 export * from "./mail-copilot.js";
 export * from "./marketing-copilot.js";
+export * from "./freelance-copilot.js";
+export * from "./design.js";
+export * from "./app-studio.js";
+export * from "./security-copilot.js";
+export * from "./app-signin.js";
+export * from "./video.js";
 export * from "./notifications.js";
 export * from "./council.js";
+export * from "./nous.js";
+export * from "./nous-pane-board.js";
 export * from "./version.js";
 export * from "./observability.js";
 
 export * from "./managed-plan-execution.js";
 export * from "./dots.js";
 export * from "./dot-home.js";
+export * from "./dot-personality.js";
 export * from "./dot-tools.js";
 export * from "./dot-goals.js";
 export * from "./dot-schedules.js";
@@ -61,3 +72,14 @@ export * from "./dot-connectors.js";
 export * from "./repository-providers.js";
 export * from "./space-instance.js";
 export * from "./instance-releases.js";
+export * from "./vault.js";
+export * from "./vault-crypto.js";
+export * from "./vault-password.js";
+export * from "./vault-fill.js";
+export * from "./vault-handoff.js";
+
+export * from "./setup-catalog.js";
+
+export * from "./setup-state.js";
+export * from "./workspace-widget-functions.js";
+export * from "./setup-client-runtime.js";
